@@ -44,6 +44,28 @@ def process_view(
         is_insert: bool=False,
         is_update: bool=False,
         ctx: context.CompilerContext) -> s_nodes.Node:
+
+    with ctx.newscope(fenced=True, temporary=True) as scopectx:
+        scopectx.path_scope.add_path(path_id)
+
+        return _process_view(
+            scls=scls, path_id=path_id, elements=elements,
+            view_rptr=view_rptr, view_name=view_name,
+            is_insert=is_insert, is_update=is_update,
+            ctx=scopectx
+        )
+
+
+def _process_view(
+        *,
+        scls: s_nodes.Node,
+        path_id: irast.PathId,
+        elements: typing.List[qlast.ShapeElement],
+        view_rptr: typing.Optional[context.ViewRPtr]=None,
+        view_name: typing.Optional[sn.SchemaName]=None,
+        is_insert: bool=False,
+        is_update: bool=False,
+        ctx: context.CompilerContext) -> s_nodes.Node:
     view_scls = schemactx.derive_view(
         scls, is_insert=is_insert, is_update=is_update,
         derived_name=view_name, ctx=ctx)
@@ -234,12 +256,12 @@ def _normalize_view_ptr_expr(
                             'only references to link properties are allowed '
                             'in nested UPDATE shapes', context=subel.context)
 
-                ptr_target = process_view(
+                ptr_target = _process_view(
                     scls=ptr_target, path_id=sub_path_id,
                     view_rptr=sub_view_rptr,
                     elements=shape_el.elements, is_update=True, ctx=ctx)
             else:
-                ptr_target = process_view(
+                ptr_target = _process_view(
                     scls=ptr_target, path_id=sub_path_id,
                     view_rptr=sub_view_rptr,
                     elements=shape_el.elements, ctx=ctx)
@@ -289,7 +311,7 @@ def _normalize_view_ptr_expr(
 
         qlexpr = astutils.ensure_qlstmt(compexpr)
 
-        with ctx.newscope(fenced=True, temporary=True) as shape_expr_ctx:
+        with ctx.newscope(fenced=True) as shape_expr_ctx:
             # Put current pointer class in context, so
             # that references to link properties in sub-SELECT
             # can be resolved.  This is necessary for proper
@@ -297,6 +319,8 @@ def _normalize_view_ptr_expr(
             # most importantly, in INSERT/UPDATE context.
             shape_expr_ctx.view_rptr = context.ViewRPtr(
                 view_scls, ptrcls, is_insert=is_insert, is_update=is_update)
+
+            shape_expr_ctx.path_scope.unnest_fence = True
 
             if is_mutation:
                 shape_expr_ctx.expr_exposed = True

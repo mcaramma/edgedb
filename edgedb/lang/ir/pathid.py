@@ -147,6 +147,20 @@ class PathId:
         result._is_ptr = self._is_ptr
         return result
 
+    def merge_namespace(self, namespace):
+        new_namespace = []
+        other_len = len(namespace)
+        i = -1
+        for i, item in enumerate(self._namespace):
+            if i > other_len - 1 or namespace[i] != item:
+                break
+            else:
+                new_namespace.append(item)
+
+        new_namespace.extend(namespace[i + 1:])
+
+        return self.replace_namespace(tuple(new_namespace))
+
     def strip_weak_namespaces(self):
         stripped_ns = tuple(bit for bit in self._namespace
                             if not isinstance(bit, WeakNamespace))
@@ -611,25 +625,27 @@ class ScopeBranchNode(BaseScopeTreeNode):
     def __repr__(self):
         return f'<ScopeBranchNode at {id(self):0x}>'
 
-    def _unnest_node(self, node, respect_fences=False):
-        descendants = self._remove_descendants(
-            node.path_id, respect_fences=respect_fences, min_depth=1)
-        if descendants:
-            d0 = self._merge_nodes(descendants)
-            self.attach_child(d0)
-            return True
+    def _unnest_node(self, node, respect_fences=False, validate_only=False,
+                     unnest_fence=False):
+        if not validate_only:
+            descendants = self._remove_descendants(
+                node.path_id, respect_fences=respect_fences, min_depth=1)
+            if descendants:
+                d0 = self._merge_nodes(descendants)
+                self.attach_child(d0)
+                return True
 
-        parent_fence = self._parent_fence
-        if self.protect_parent or parent_fence is None:
+        parent = self.parent
+        if parent is None:
             return False
 
-        parent_fence = parent_fence()
+        unnest_fence = unnest_fence or self.unnest_fence
 
-        if isinstance(self, ScopeFenceNode) and self.unnest_fence:
+        if isinstance(self, ScopeFenceNode) and unnest_fence:
             for prefix in reversed(list(node.path_id.iter_prefixes())):
-                if parent_fence.is_visible(prefix):
+                if parent.is_visible(prefix):
                     break
-                cnode = parent_fence.find_descendant(prefix)
+                cnode = parent.find_descendant(prefix)
 
                 if cnode is not None and cnode in cnode.parent.set_children:
 
@@ -647,12 +663,11 @@ class ScopeBranchNode(BaseScopeTreeNode):
                         existing_node=cnode
                     )
 
-        if self.parent:
-            respect_fences = isinstance(self, ScopeFenceNode) or respect_fences
-            return self.parent._unnest_node(
-                node, respect_fences=respect_fences)
-        else:
-            return False
+        respect_fences = isinstance(self, ScopeFenceNode) or respect_fences
+        return parent._unnest_node(
+            node, respect_fences=respect_fences,
+            validate_only=validate_only or self.protect_parent,
+            unnest_fence=unnest_fence)
 
     def add_path(self, path_id):
         """Ensure *path_id* is visible on this scope level."""
@@ -853,7 +868,9 @@ class ScopeFenceNode(ScopeBranchNode):
 
     @property
     def fullname(self):
-        return f'FENCE 0x{id(self):0x}'
+        return (f'FENCE{" no-unnest" if self.unnest_fence else ""} '
+                f'{",".join(self.namespaces)} '
+                f'0x{id(self):0x}')
 
     @property
     def fence(self):

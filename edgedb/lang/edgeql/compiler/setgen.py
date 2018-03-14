@@ -155,8 +155,9 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
 
     mapped = ctx.view_map.get(path_tip.path_id)
     if mapped is not None:
-        path_tip = new_set(path_id=mapped.path_id, scls=mapped.scls,
-                           expr=mapped.expr, ctx=ctx)
+        path_tip = new_set(
+            path_id=mapped.path_id,
+            scls=mapped.scls, expr=mapped.expr, ctx=ctx)
 
     path_tip.context = expr.context
     pathctx.register_set_in_scope(path_tip, ctx=ctx)
@@ -210,8 +211,9 @@ def path_step(
 
         mapped = ctx.view_map.get(path_tip.path_id)
         if mapped is not None:
-            path_tip = new_set(path_id=mapped.path_id, scls=mapped.scls,
-                               expr=mapped.expr, ctx=ctx)
+            path_tip = new_set(
+                path_id=mapped.path_id,
+                scls=mapped.scls, expr=mapped.expr, ctx=ctx)
 
         path_tip = extend_path(
             path_tip, ptrcls, direction, target, ctx=ctx)
@@ -496,6 +498,12 @@ def computable_ptr_set(
         # class refs into a separate namespace.
         subctx.path_id_namespace = (subctx.aliases.get('ns'),)
     else:
+        # subctx.path_scope = ctx.path_scope.add_fence()
+        # subctx.path_id_namespace = (
+        #     subctx.path_id_namespace +
+        #     (irast.WeakNamespace(ctx.aliases.get('ns')),))
+        # ctx.path_scope.namespaces.add(subctx.path_id_namespace[-1])
+        #
         inner_path_id = pathctx.get_path_id(self_.scls, ctx=subctx)
         subctx.view_map[inner_path_id] = rptr.source
 
