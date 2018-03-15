@@ -39,7 +39,8 @@ def compile_ir_to_sql_tree(
         expr_is_stmt = isinstance(ir_expr, irast.Statement)
         if expr_is_stmt:
             views = ir_expr.views
-            ctx.scope_tree = ir_expr.expr.path_scope
+            ctx.scope_map = ir_expr.scope_map
+            ctx.scope_tree = ir_expr.scope_tree
             ir_expr = ir_expr.expr
         else:
             views = {}

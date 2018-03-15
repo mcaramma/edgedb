@@ -128,6 +128,12 @@ class ContextLevel(compiler.ContextLevel):
     path_scope: irast.ScopeBranchNode
     """Path scope tree, with per-lexical-scope levels."""
 
+    path_scope_map: typing.Dict[irast.Set, irast.ScopeTreeNode]
+    """A forest of scope trees used for views."""
+
+    scope_id_ctr: compiler.Counter
+    """Path scope id counter."""
+
     in_aggregate: bool
     """True if the current location is inside an aggregate function call."""
 
@@ -175,6 +181,8 @@ class ContextLevel(compiler.ContextLevel):
             self.view_map = collections.ChainMap()
             self.class_shapes = collections.defaultdict(list)
             self.path_scope = None
+            self.path_scope_map = {}
+            self.scope_id_ctr = compiler.Counter()
             self.in_aggregate = False
             self.view_scls = None
             self.expr_exposed = False
@@ -201,6 +209,8 @@ class ContextLevel(compiler.ContextLevel):
             self.view_map = prevlevel.view_map
             self.class_shapes = prevlevel.class_shapes
             self.path_scope = prevlevel.path_scope
+            self.path_scope_map = prevlevel.path_scope_map
+            self.scope_id_ctr = prevlevel.scope_id_ctr
             self.view_scls = prevlevel.view_scls
             self.expr_exposed = prevlevel.expr_exposed
             self.toplevel_clause = prevlevel.toplevel_clause

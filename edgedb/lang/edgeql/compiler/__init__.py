@@ -90,9 +90,8 @@ def compile_ast_to_ir(tree,
     ir_expr = stmtctx.fini_expression(ir_set, ctx=ctx)
 
     if debug.flags.edgeql_compile:
-        if ir_expr.expr.path_scope:
-            debug.header('Scope Tree')
-            print(ir_expr.expr.path_scope.pdebugformat())
+        debug.header('Scope Tree')
+        print(ctx.path_scope.pdebugformat())
         debug.header('EdgeDB IR')
         debug.dump(ir_expr)
 

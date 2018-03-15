@@ -65,16 +65,16 @@ def fini_expression(
         if ir_set.path_id.namespace:
             ir_set.path_id = ir_set.path_id.strip_weak_namespaces()
 
-    if ir.path_scope is not None:
-        for node in ir.path_scope.get_all_path_nodes(include_subpaths=True):
-            if node.path_id.namespace:
-                node.path_id = node.path_id.strip_weak_namespaces()
+    for node in ctx.path_scope.get_all_path_nodes(include_subpaths=True):
+        if node.path_id.namespace:
+            node.path_id = node.path_id.strip_weak_namespaces()
 
     result = irast.Statement(
         expr=ir,
         params=ctx.arguments,
         views=ctx.view_nodes,
         source_map=ctx.source_map,
+        scope_tree=ctx.path_scope,
     )
     irutils.infer_type(result, schema=ctx.schema)
     return result
@@ -181,6 +181,7 @@ def declare_view(
         view_set.path_id = view_set.path_id.replace_namespace(
             ctx.path_id_namespace)
         ctx.aliased_views[alias] = view_set.scls
+        ctx.path_scope_map[view_set] = subctx.path_scope
 
     return view_set
 

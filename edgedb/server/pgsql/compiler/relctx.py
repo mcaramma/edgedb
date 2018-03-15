@@ -432,16 +432,29 @@ def ensure_transient_identity_for_set(
     pathctx.put_path_bond(stmt, ir_set.path_id)
 
 
+def get_scope(
+        ir_set: irast.Set, *,
+        ctx: context.CompilerContextLevel) -> \
+        typing.Optional[irast.ScopeTreeNode]:
+    if ir_set.path_scope_id is None:
+        return None
+    else:
+        return ctx.scope_tree.find_by_unique_id(ir_set.path_scope_id)
+
+
 def update_scope(
         ir_set: irast.Set, stmt: pgast.Query, *,
         ctx: context.CompilerContextLevel) -> None:
 
-    ctx.scope_tree = ir_set.path_scope
+    scope_tree = ctx.scope_tree.find_by_unique_id(ir_set.path_scope_id)
+    ctx.scope_tree = scope_tree
+
+    child_paths = set(scope_tree.paths)
     ctx.path_scope = ctx.path_scope.new_child()
-    child_paths = set(ir_set.path_scope.paths)
     ctx.path_scope.update({p: stmt for p in child_paths})
-    for child_path in ir_set.path_scope.get_all_paths():
-        parent_scope = ctx.scope_tree.parent
+
+    for child_path in scope_tree.get_all_paths():
+        parent_scope = scope_tree.parent
         if parent_scope is None or not parent_scope.is_visible(child_path):
             stmt.path_id_mask.add(child_path)
 

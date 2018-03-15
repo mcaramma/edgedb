@@ -52,6 +52,7 @@ def new_set_from_set(
         ctx: context.ContextLevel) -> irast.Set:
     result = new_set(
         path_id=ir_set.path_id.merge_namespace(ctx.path_id_namespace),
+        path_scope_id=ir_set.path_scope_id,
         scls=ir_set.scls,
         expr=ir_set.expr,
         ctx=ctx
@@ -110,8 +111,8 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 view_set = ctx.view_sets.get(scls)
                 if view_set is not None:
                     path_tip = new_set_from_set(view_set, ctx=ctx)
-                    if view_set.path_scope is not None:
-                        extra_scopes[path_tip] = view_set.path_scope.copy()
+                    path_scope = ctx.path_scope_map.get(view_set)
+                    extra_scopes[path_tip] = path_scope.copy()
 
                 view_scls = ctx.class_view_overrides.get(scls.name)
                 if view_scls is not None:
@@ -178,10 +179,12 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
             node = ctx.path_scope.find_descendant(ir_set.path_id)
             if node:
                 node.attach_branch(scope)
-                if ir_set.path_scope is None:
-                    ir_set.path_scope = node
-                elif ir_set.path_scope is scope:
-                    ir_set.path_scope = None
+                set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+                if set_scope is None:
+                    pathctx.assign_set_scope(ir_set, node, ctx=ctx)
+                elif set_scope is scope:
+                    pathctx.assign_set_scope(ir_set, None, ctx=ctx)
+
     return path_tip
 
 
@@ -406,8 +409,7 @@ def scoped_set(
         path_id: typing.Optional[irast.PathId]=None,
         ctx: context.ContextLevel) -> irast.Set:
     ir_set = ensure_set(expr, typehint=typehint, path_id=path_id, ctx=ctx)
-    if ir_set.path_scope is None:
-        ir_set.path_scope = ctx.path_scope
+    pathctx.assign_set_scope(ir_set, ctx.path_scope, ctx=ctx)
     return ir_set
 
 
@@ -470,6 +472,7 @@ def computable_ptr_set(
     subctx.path_scope = ctx.path_scope
     subctx.class_shapes = ctx.class_shapes.copy()
     subctx.all_sets = ctx.all_sets
+    subctx.path_scope_map = ctx.path_scope_map
 
     if isinstance(ptrcls, s_linkprops.LinkProperty):
         source_path_id = rptr.source.path_id.ptr_path()

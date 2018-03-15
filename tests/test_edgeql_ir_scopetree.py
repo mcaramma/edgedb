@@ -24,7 +24,7 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
     def run_test(self, *, source, spec, expected):
         ir = compiler.compile_to_ir(source, self.schema)
 
-        path_scope = textwrap.indent(ir.expr.path_scope.pformat(), '    ')
+        path_scope = textwrap.indent(ir.scope_tree.pformat(), '    ')
         expected_scope = textwrap.indent(
             textwrap.dedent(expected).strip(' \n'), '    ')
 

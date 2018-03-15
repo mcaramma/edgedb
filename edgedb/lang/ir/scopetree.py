@@ -16,6 +16,9 @@ from . import pathid
 
 
 class ScopeTreeNode(pathid.ScopeBranchNode):
+    unique_id: typing.Optional[int]
+    """A unique identifier used to map scopes on sets."""
+
     path_id: typing.Optional[pathid.PathId]
     """Node path id, or None for branch nodes."""
 
@@ -44,7 +47,8 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
     views declared in a WITH block."""
 
     def __init__(self, *, path_id: typing.Optional[pathid.PathId]=None,
-                 fenced: bool=False):
+                 fenced: bool=False, unique_id: typing.Optional[int]=None):
+        self.unique_id = unique_id
         self.path_id = path_id
         self.fenced = fenced
         self.protect_parent = False
@@ -65,6 +69,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
         cp.optional = self.optional
         cp.unnest_fence = self.unnest_fence
         cp.namespaces = set(self.namespaces)
+        cp.unique_id = self.unique_id
         cp._set_parent(parent)
 
         for child in self.children:
@@ -82,6 +87,8 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
     @property
     def debugname(self):
         parts = [f'{self.name}']
+        if self.unique_id:
+            parts.append(f'uid:{self.unique_id}')
         if self.namespaces:
             parts.append(','.join(self.namespaces))
         if self.unnest_fence:
@@ -457,6 +464,14 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
             unnest_fence_seen = unnest_fence_seen or node.unnest_fence
 
         return None, unnest_fence_seen
+
+    def find_by_unique_id(self, unique_id: int) \
+            -> typing.Optional['ScopeTreeNode']:
+        for node in self.descendants:
+            if node.unique_id == unique_id:
+                return node
+
+        return None
 
     def copy(self) -> 'ScopeTreeNode':
         """Return a complete copy of this subtree."""

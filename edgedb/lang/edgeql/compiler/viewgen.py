@@ -494,20 +494,25 @@ def _compile_view_shapes_in_set(
             element = setgen.extend_path(
                 path_tip, ptr, force_computable=is_mutation,
                 unnest_fence=True, ctx=ctx)
-            if element.path_scope is None:
-                element.path_scope = ctx.path_scope.add_fence()
+
+            element_scope = pathctx.get_set_scope(element, ctx=ctx)
+
+            if element_scope is None:
+                element_scope = ctx.path_scope.add_fence()
+                pathctx.assign_set_scope(element, element_scope, ctx=ctx)
 
             with ctx.new() as scopectx:
-                scopectx.path_scope = element.path_scope
+                scopectx.path_scope = element_scope
                 compile_view_shapes(
                     element, parent_view_type=scls.view_type, ctx=scopectx)
 
             ir_set.shape.append(element)
 
     elif ir_set.expr is not None:
-        if ir_set.path_scope is not None:
+        set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+        if set_scope is not None:
             with ctx.new() as scopectx:
-                scopectx.path_scope = ir_set.path_scope
+                scopectx.path_scope = set_scope
                 compile_view_shapes(ir_set.expr, ctx=scopectx)
         else:
             compile_view_shapes(ir_set.expr, ctx=ctx)
