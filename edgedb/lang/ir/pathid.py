@@ -166,6 +166,11 @@ class PathId:
                             if not isinstance(bit, WeakNamespace))
         return self.replace_namespace(stripped_ns)
 
+    def strip_namespace(self, namespace):
+        stripped_ns = tuple(bit for bit in self._namespace
+                            if bit in namespace)
+        return self.replace_namespace(stripped_ns)
+
     def iter_weak_namespace_prefixes(self):
         yield self
 
@@ -608,7 +613,11 @@ class BaseScopeTreeNode:
             return f'"{self.fullname}"'
 
 
-class ScopeBranchNode(BaseScopeTreeNode):
+class ScopeBranchNode:
+    pass
+
+
+class _ScopeBranchNode(BaseScopeTreeNode, ScopeBranchNode):
     def __init__(self, *, parent=None):
         super().__init__(parent=parent)
         self.path_id = None
@@ -836,7 +845,7 @@ class ScopeBranchNode(BaseScopeTreeNode):
             return super().pformat()
 
 
-class ScopePathNode(ScopeBranchNode):
+class ScopePathNode(_ScopeBranchNode):
     def __init__(self, *, parent, path_id):
         super().__init__(parent=parent)
         self.path_id = path_id
@@ -858,7 +867,7 @@ class ScopePathNode(ScopeBranchNode):
         return False
 
 
-class ScopeFenceNode(ScopeBranchNode):
+class ScopeFenceNode(_ScopeBranchNode):
     def __repr__(self):
         return f'<ScopeFenceNode at {id(self):0x}>'
 

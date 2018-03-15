@@ -20,6 +20,12 @@ from edgedb.lang.edgeql import ast as qlast
 
 from .pathid import PathId, ScopeBranchNode, ScopeFenceNode  # noqa
 from .pathid import InvalidScopeConfiguration, WeakNamespace  # noqa
+from .scopetree import ScopeTreeNode
+
+
+import os
+if os.getenv('EDGEDB_DEBUG_NEW_SCOPETREE'):
+    ScopeFenceNode = ScopeTreeNode  # noqa
 
 
 EdgeDBMatchOperator = qlast.EdgeQLMatchOperator
