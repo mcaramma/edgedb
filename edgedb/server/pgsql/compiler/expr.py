@@ -53,7 +53,7 @@ def compile_Set(
         if shape:
             value = _compile_shape(ir_set, shape=shape, ctx=ctx)
 
-    elif ir_set.path_scope is not None:
+    elif ir_set.path_scope is not None and ctx.toplevel_stmt is not None:
         # This Set is behind a scope fence, so compute it
         # in a fenced context.
         with ctx.newscope() as scopectx:

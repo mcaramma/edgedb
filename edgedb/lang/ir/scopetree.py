@@ -81,10 +81,13 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
 
     @property
     def debugname(self):
-        return (f'{self.name}'
-                f'{",".join(self.namespaces)}'
-                f'{" no-unnest" if self.unnest_fence else ""}'
-                f' 0x{id(self):0x}')
+        parts = [f'{self.name}']
+        if self.namespaces:
+            parts.append(','.join(self.namespaces))
+        if self.unnest_fence:
+            parts.append('no-unnest')
+        parts.append(f'0x{id(self):0x}')
+        return ' '.join(parts)
 
     @property
     def ancestors(self) -> typing.Iterator['ScopeTreeNode']:
@@ -119,7 +122,10 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
         """An iterator of node's children that have path ids."""
         return filter(lambda p: p.path_id is not None, self.children)
 
-    paths = path_children  # XXX: compat
+    # XXX: compat
+    @property
+    def paths(self) -> typing.List[pathid.PathId]:
+        return [p.path_id for p in self.path_children]
 
     def get_all_paths(self):
         paths = set()
@@ -413,6 +419,13 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
 
     is_visible = find_visible  # XXX: compat
 
+    def is_any_prefix_visible(self, path_id: pathid.PathId) -> bool:
+        for prefix in reversed(list(path_id.iter_prefixes())):
+            if self.find_visible(prefix) is not None:
+                return True
+
+        return False
+
     def find_child(self, path_id: pathid.PathId) \
             -> typing.Optional['ScopeTreeNode']:
         for child in self.children:
@@ -475,6 +488,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
                 if cf:
                     child_formats.append(cf)
 
+            child_formats = sorted(child_formats)
             children = textwrap.indent(',\n'.join(child_formats), '    ')
             return f'"{self.debugname}": {{\n{children}\n}}'
         else:

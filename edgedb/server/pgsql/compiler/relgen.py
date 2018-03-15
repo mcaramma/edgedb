@@ -95,6 +95,10 @@ def get_set_rvar(
         # about it later.
         subctx.pending_query = stmt
 
+        if ctx.toplevel_stmt is None:
+            # This is a top Set
+            ctx.toplevel_stmt = stmt
+
         if scope_stmt is None:
             scope_stmt = ctx.rel
             if ir_set.path_scope and ir_set.path_scope.is_visible(path_id):

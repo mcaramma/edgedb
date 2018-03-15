@@ -36,10 +36,11 @@ def compile_ir_to_sql_tree(
         # Transform to sql tree
         ctx_stack = context.CompilerContext()
         ctx = ctx_stack.current
-        if isinstance(ir_expr, irast.Statement):
+        expr_is_stmt = isinstance(ir_expr, irast.Statement)
+        if expr_is_stmt:
             views = ir_expr.views
             ctx.scope_tree = ir_expr.expr.path_scope
-            ir_expr = ir_expr.expr.expr
+            ir_expr = ir_expr.expr
         else:
             views = {}
         ctx.env = context.Environment(
@@ -49,6 +50,8 @@ def compile_ir_to_sql_tree(
         if ignore_shapes:
             ctx.expr_exposed = False
         qtree = dispatch.compile(ir_expr, ctx=ctx)
+        if expr_is_stmt:
+            qtree = ctx.toplevel_stmt
 
     except Exception as e:  # pragma: no cover
         try:

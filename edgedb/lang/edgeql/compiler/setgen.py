@@ -47,6 +47,18 @@ def new_set(*, ctx: context.ContextLevel, **kwargs) -> irast.Set:
     return ir_set
 
 
+def new_set_from_set(
+        ir_set: irast.Set, *,
+        ctx: context.ContextLevel) -> irast.Set:
+    result = new_set(
+        path_id=ir_set.path_id.merge_namespace(ctx.path_id_namespace),
+        scls=ir_set.scls,
+        expr=ir_set.expr,
+        ctx=ctx
+    )
+    return result
+
+
 def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
     anchors = ctx.anchors
 
@@ -97,8 +109,7 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 path_tip = class_set(scls, ctx=ctx)
                 view_set = ctx.view_sets.get(scls)
                 if view_set is not None:
-                    path_tip.expr = view_set.expr
-                    path_tip.path_id = view_set.path_id
+                    path_tip = new_set_from_set(view_set, ctx=ctx)
                     if view_set.path_scope is not None:
                         extra_scopes[path_tip] = view_set.path_scope.copy()
 
@@ -297,6 +308,9 @@ def extend_path(
         path_id = source_set.path_id.extend(ptrcls, direction, target)
     else:
         path_id = source_set.path_id.extend(ptrcls, direction, target)
+
+    if ctx.path_id_namespace:
+        path_id = path_id.merge_namespace(ctx.path_id_namespace)
 
     target_set = new_set(scls=target, path_id=path_id, ctx=ctx)
 
@@ -505,7 +519,8 @@ def computable_ptr_set(
         subctx.path_scope.namespaces.add(subctx.path_id_namespace[-1])
 
         inner_path_id = pathctx.get_path_id(self_.scls, ctx=subctx)
-        subctx.view_map[inner_path_id] = rptr.source
+        subctx.view_map[inner_path_id] = new_set_from_set(
+            rptr.source, ctx=subctx)
 
     if isinstance(qlexpr, qlast.Statement) and unnest_fence:
         subctx.stmt_metadata[qlexpr] = context.StatementMetadata(
