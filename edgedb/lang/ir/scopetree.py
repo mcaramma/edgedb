@@ -25,6 +25,9 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
     protect_parent: bool
     """Whether the subtree represents a scope that must not affect parents."""
 
+    unnest_fence: bool
+    """Prevent unnesting in parents."""
+
     optional: bool
     """Whether this node represents an optional path."""
 
@@ -45,6 +48,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
         self.path_id = path_id
         self.fenced = fenced
         self.protect_parent = False
+        self.unnest_fence = False
         self.optional = False
         self.children = set()
         self.namespaces = set()
@@ -59,6 +63,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
             path_id=self.path_id,
             fenced=self.fenced)
         cp.optional = self.optional
+        cp.unnest_fence = self.unnest_fence
         cp.namespaces = set(self.namespaces)
         cp._set_parent(parent)
 
@@ -76,7 +81,10 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
 
     @property
     def debugname(self):
-        return f'{self.name} 0x{id(self):0x}'
+        return (f'{self.name}'
+                f'{",".join(self.namespaces)}'
+                f'{" no-unnest" if self.unnest_fence else ""}'
+                f' 0x{id(self):0x}')
 
     @property
     def ancestors(self) -> typing.Iterator['ScopeTreeNode']:
@@ -110,6 +118,18 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
     def path_children(self) -> typing.Iterator['ScopeTreeNode']:
         """An iterator of node's children that have path ids."""
         return filter(lambda p: p.path_id is not None, self.children)
+
+    paths = path_children  # XXX: compat
+
+    def get_all_paths(self):
+        paths = set()
+
+        if self.path_id:
+            paths.add(self.path_id)
+        else:
+            paths.update(p.path_id for p in self.path_children)
+
+        return paths
 
     @property
     def descendants(self) -> typing.Iterator['ScopeTreeNode']:
@@ -181,13 +201,13 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
 
         return None
 
-    def find_descendant(self, path_id: pathid.PathId) \
-            -> typing.Optional['ScopeTreeNode']:
-        for descendant in self.strict_unfenced_descendants:
-            if descendant.path_id == path_id:
-                return descendant
-
-        return None
+    @property
+    def root(self) -> 'ScopeTreeNode':
+        """The root of this tree."""
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
 
     def attach_child(self, node: 'ScopeTreeNode') -> None:
         """Attach a child node to this node.
@@ -250,18 +270,36 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
             path_id = descendant.path_id.strip_namespace(dns)
             if self.find_visible(path_id) is not None:
                 # This path is already present in the tree, discard.
-                descendant.destroy()
+                descendant.remove()
 
             elif descendant.parent_fence is node:
                 # Unfenced path, find similarly unfenced in the
                 # tree.  If found, attach to the parent fence and
                 # remove all other occurrences.
-                unfenced = self.find_unfenced(path_id)
+                unfenced, unnest_fence = self.find_unfenced(path_id)
                 if unfenced is not None:
                     parent_fence = unfenced.parent_fence
-                    parent_fence.remove_descendants(path_id)
-                    parent_fence.attach_child(unfenced)
-                    descendant.destroy()
+                    if parent_fence.find_child(path_id) is None:
+                        if unnest_fence:
+                            if descendant.parent.path_id:
+                                offending_node = descendant.parent
+                            else:
+                                offending_node = descendant
+                            raise pathid.InvalidScopeConfiguration(
+                                f'reference to '
+                                f'{offending_node.path_id.pformat()!r} '
+                                f'changes the interpretation of '
+                                f'{unfenced.path_id.pformat()!r} in '
+                                f'an outer scope',
+                                offending_node=offending_node,
+                                existing_node=unfenced
+                            )
+
+                        parent_fence.remove_descendants(path_id)
+                        parent_fence.attach_child(unfenced)
+
+                    # Discard the node from the subtree being attached.
+                    descendant.remove()
 
         for descendant in tuple(node.children):
             # Attach whatever is remaining in the subtree.
@@ -293,7 +331,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
                 matching.add(node)
 
         for node in matching:
-            node.destroy()
+            node.remove()
 
     def contain_path(self, path_id: pathid.PathId) -> None:
         pass
@@ -304,8 +342,13 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
         if node is not None:
             node.optional = True
 
-    def destroy(self):
-        """Remove this node from the tree."""
+    def is_optional(self, path_id):
+        node = self.find_visible(path_id)
+        if node is not None:
+            return node.optional
+
+    def remove(self):
+        """Remove this node from the tree (subtree becomes independent)."""
         parent = self.parent
         if parent is not None:
             parent.remove_subtree(self)
@@ -368,19 +411,39 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
 
         return None
 
-    def find_unfenced(self, path_id: pathid.PathId) \
+    is_visible = find_visible  # XXX: compat
+
+    def find_child(self, path_id: pathid.PathId) \
             -> typing.Optional['ScopeTreeNode']:
+        for child in self.children:
+            if child.path_id == path_id:
+                return child
+
+        return None
+
+    def find_descendant(self, path_id: pathid.PathId) \
+            -> typing.Optional['ScopeTreeNode']:
+        for child in self.strict_descendants:
+            if child.path_id == path_id:
+                return child
+
+        return None
+
+    def find_unfenced(self, path_id: pathid.PathId) \
+            -> typing.Tuple[typing.Optional['ScopeTreeNode'], bool]:
         """Find the unfenced node with the given *path_id*."""
         namespaces = set()
+        unnest_fence_seen = False
 
         for node, ans in self.ancestors_and_namespaces:
             for descendant in node.unfenced_descendants:
                 if _paths_equal(descendant.path_id, path_id, namespaces):
-                    return descendant
+                    return descendant, unnest_fence_seen
 
             namespaces |= ans
+            unnest_fence_seen = unnest_fence_seen or node.unnest_fence
 
-        return None
+        return None, unnest_fence_seen
 
     def copy(self) -> 'ScopeTreeNode':
         """Return a complete copy of this subtree."""
@@ -439,14 +502,8 @@ def _paths_equal(path_id_1: pathid.PathId, path_id_2: pathid.PathId,
         return False
 
     if namespaces:
-        ns1 = path_id_1.namespace
-        ns2 = path_id_2.namespace
-
-        if ns1 and ns1[-1] in namespaces:
-            path_id_1 = path_id_1.replace_namespace(ns1[:-1])
-
-        if ns2 and ns2[-1] in namespaces:
-            path_id_2 = path_id_2.replace_namespace(ns2[:-1])
+        path_id_1 = path_id_1.strip_namespace(namespaces)
+        path_id_2 = path_id_2.strip_namespace(namespaces)
 
     return path_id_1 == path_id_2
 

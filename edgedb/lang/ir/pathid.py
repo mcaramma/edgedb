@@ -169,7 +169,7 @@ class PathId:
     def strip_namespace(self, namespace):
         if self._namespace and namespace:
             stripped_ns = tuple(bit for bit in self._namespace
-                                if bit in namespace)
+                                if bit not in namespace)
             return self.replace_namespace(stripped_ns)
         else:
             return self

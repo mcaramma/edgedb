@@ -12,7 +12,7 @@ import textwrap
 
 from edgedb.lang import _testbase as tb
 
-from edgedb.lang.edgeql import compiler
+from edgedb.lang.edgeql import compiler, errors
 
 
 class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
@@ -22,7 +22,6 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
                           'cards.eschema')
 
     def run_test(self, *, source, spec, expected):
-        print('===================================')
         ir = compiler.compile_to_ir(source, self.schema)
 
         path_scope = textwrap.indent(ir.expr.path_scope.pformat(), '    ')
@@ -540,4 +539,42 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
                 "(test::User).>(test::deck)[IS test::Card]"
             }
         }
+        """
+
+    @tb.must_fail(errors.EdgeQLSyntaxError,
+                  "reference to 'User.name' changes the interpretation",
+                  line=4, col=9)
+    def test_edgeql_ir_scope_tree_bad_01(self):
+        """
+        WITH MODULE test
+        SELECT User.deck
+        FILTER User.name
+        """
+
+    @tb.must_fail(errors.EdgeQLSyntaxError,
+                  "reference to 'User' changes the interpretation",
+                  line=4, col=9)
+    def test_edgeql_ir_scope_tree_bad_02(self):
+        """
+        WITH MODULE test
+        SELECT User.deck
+        FILTER User.deck@count
+        """
+
+    @tb.must_fail(errors.EdgeQLSyntaxError,
+                  "reference to 'User' changes the interpretation",
+                  line=3, col=35)
+    def test_edgeql_ir_scope_tree_bad_03(self):
+        """
+        WITH MODULE test
+        SELECT User.deck { foo := User }
+        """
+
+    @tb.must_fail(errors.EdgeQLSyntaxError,
+                  "reference to 'User.name' changes the interpretation",
+                  line=3, col=40)
+    def test_edgeql_ir_scope_tree_bad_04(self):
+        """
+        WITH MODULE test
+        UPDATE User.deck SET { name := User.name }
         """

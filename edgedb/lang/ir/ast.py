@@ -25,14 +25,14 @@ from .scopetree import ScopeTreeNode
 
 import os
 
-if os.getenv('EDGEDB_DEBUG_NEW_SCOPETREE'):
+if os.getenv('EDGEDB_DEBUG_OLD_SCOPETREE'):
+    def new_scope_tree():
+        return ScopeFenceNode()
+else:
     ScopeFenceNode = ScopeTreeNode  # noqa
 
     def new_scope_tree():
         return ScopeTreeNode(fenced=True)
-else:
-    def new_scope_tree():
-        return ScopeFenceNode()
 
 
 EdgeDBMatchOperator = qlast.EdgeQLMatchOperator

@@ -34,7 +34,8 @@ def register_set_in_scope(
     try:
         path_scope.add_path(ir_set.path_id)
     except irast.InvalidScopeConfiguration as e:
-        raise errors.EdgeQLError(e.args[0], context=ir_set.context) from e
+        raise errors.EdgeQLSyntaxError(
+            e.args[0], context=ir_set.context) from e
 
 
 def mark_path_as_optional(
