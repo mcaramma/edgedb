@@ -167,9 +167,12 @@ class PathId:
         return self.replace_namespace(stripped_ns)
 
     def strip_namespace(self, namespace):
-        stripped_ns = tuple(bit for bit in self._namespace
-                            if bit in namespace)
-        return self.replace_namespace(stripped_ns)
+        if self._namespace and namespace:
+            stripped_ns = tuple(bit for bit in self._namespace
+                                if bit in namespace)
+            return self.replace_namespace(stripped_ns)
+        else:
+            return self
 
     def iter_weak_namespace_prefixes(self):
         yield self
