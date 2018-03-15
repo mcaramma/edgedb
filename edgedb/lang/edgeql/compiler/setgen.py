@@ -101,6 +101,10 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                     path_tip.path_id = view_set.path_id
                     if view_set.path_scope is not None:
                         extra_scopes[path_tip] = view_set.path_scope
+                        print('xtrascope', path_tip)
+                        print(view_set.path_scope.pdebugformat())
+                        import traceback
+                        traceback.print_stack()
 
                 view_scls = ctx.class_view_overrides.get(scls.name)
                 if view_scls is not None:
@@ -167,6 +171,7 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
             node = ctx.path_scope.find_descendant(ir_set.path_id)
             if node:
                 node.attach_branch(scope)
+                print(node.parent.parent.pdebugformat())
                 if ir_set.path_scope is None:
                     ir_set.path_scope = node
                 elif ir_set.path_scope is scope:

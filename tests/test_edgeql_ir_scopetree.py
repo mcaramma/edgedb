@@ -22,6 +22,7 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
                           'cards.eschema')
 
     def run_test(self, *, source, spec, expected):
+        print('===================================')
         ir = compiler.compile_to_ir(source, self.schema)
 
         path_scope = textwrap.indent(ir.expr.path_scope.pformat(), '    ')
@@ -90,8 +91,8 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
 
 % OK %
         "FENCE": {
-            "(test::Card).<(test::deck)[IS test::User]",
             "(test::Card)",
+            "(test::Card).<(test::deck)[IS test::User]",
             "FENCE": {
                 "(test::Card).>(test::owner)[IS test::User]"
             }

@@ -332,7 +332,7 @@ def init_stmt(
     ctx.stmt = irstmt
     if ctx.toplevel_stmt is None:
         parent_ctx.toplevel_stmt = ctx.toplevel_stmt = irstmt
-        parent_ctx.path_scope = ctx.path_scope = irast.ScopeFenceNode()
+        parent_ctx.path_scope = ctx.path_scope = irast.new_scope_tree()
     else:
         ctx.path_scope = parent_ctx.path_scope.add_fence()
 
