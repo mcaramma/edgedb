@@ -643,7 +643,12 @@ def process_set_as_subquery(
         if is_atom_path:
             source_is_visible = True
         else:
-            source_is_visible = ctx.scope_tree.parent_fence.is_visible(
+            # Non-atomic computable pointer.  Theck if path source is
+            # visible in the outer scope.  The fwo fence indirections
+            # are to compensate for the extra fence around all computables
+            # in shapes.
+            outer_fence = ctx.scope_tree.parent_fence.parent_fence
+            source_is_visible = outer_fence.is_visible(
                 ir_source.path_id)
 
         if source_is_visible:
