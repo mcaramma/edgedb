@@ -1320,7 +1320,7 @@ class TestExpressions(tb.QueryTestCase):
 
             await self.query('''\
                 WITH MODULE test
-                SELECT Issue.name ORDER BY Issue.watchers.name;
+                SELECT Issue ORDER BY Issue.watchers.name;
             ''')
 
     async def test_edgeql_expr_cardinality_02(self):

@@ -340,10 +340,10 @@ def init_stmt(
     else:
         ctx.path_scope = parent_ctx.path_scope.add_fence()
 
-    if parent_ctx.pending_stmt_path_id_namespace:
-        ctx.path_id_namespace += (parent_ctx.pending_stmt_path_id_namespace,)
-        ctx.path_scope.namespaces.add(
-            parent_ctx.pending_stmt_path_id_namespace)
+    pending_ns = parent_ctx.pending_stmt_path_id_namespace
+    if pending_ns:
+        ctx.path_id_namespace += tuple(pending_ns)
+        ctx.path_scope.namespaces.update(pending_ns)
 
     metadata = ctx.stmt_metadata.get(qlstmt)
     if metadata is not None and metadata.is_unnest_fence:

@@ -541,6 +541,24 @@ class TestEdgeQLIRScopeTree(tb.BaseEdgeQLCompilerTest):
         }
         """
 
+    def test_edgeql_ir_scope_tree_24(self):
+        """
+        WITH
+            MODULE test,
+            A := {1, 2}
+        SELECT _ := (User{name, a := A}, A)
+
+% OK %
+        "FENCE": {
+            "(_::__view__|_@@w~2)": {
+                "FENCE": {
+                    "(_::__view__|A@@w~1)",
+                    "(test::User)",
+                }
+            }
+        }
+        """
+
     @tb.must_fail(errors.EdgeQLSyntaxError,
                   "reference to 'User.name' changes the interpretation",
                   line=4, col=9)

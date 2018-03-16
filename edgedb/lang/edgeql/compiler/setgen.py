@@ -478,7 +478,8 @@ def scoped_set(
         path_id: typing.Optional[irast.PathId]=None,
         ctx: context.ContextLevel) -> irast.Set:
     ir_set = ensure_set(expr, typehint=typehint, path_id=path_id, ctx=ctx)
-    pathctx.assign_set_scope(ir_set, ctx.path_scope, ctx=ctx)
+    if ir_set.path_scope_id is None:
+        pathctx.assign_set_scope(ir_set, ctx.path_scope, ctx=ctx)
     return ir_set
 
 
@@ -586,19 +587,23 @@ def computable_ptr_set(
         subctx.path_id_namespace = (subctx.aliases.get('ns'),)
     else:
         subns = subctx.pending_stmt_path_id_namespace = \
-            irast.WeakNamespace(ctx.aliases.get('ns'))
+            {irast.WeakNamespace(ctx.aliases.get('ns'))}
 
         self_view = ctx.view_sets.get(self_.scls)
         if self_view:
+            if self_view.path_id.namespace:
+                subns.update(self_view.path_id.namespace)
             inner_path_id = self_view.path_id.merge_namespace(
-                subctx.path_id_namespace + (subns,))
+                subctx.path_id_namespace + tuple(subns))
         else:
+            if self_.path_id.namespace:
+                subns.update(self_.path_id.namespace)
             inner_path_id = pathctx.get_path_id(
-                self_.scls, ctx=subctx).merge_namespace((subns,))
+                self_.scls, ctx=subctx).merge_namespace(subns)
 
         remapped_source = new_set_from_set(rptr.source, ctx=subctx)
         remapped_source.path_id = \
-            remapped_source.path_id.merge_namespace((subns,))
+            remapped_source.path_id.merge_namespace(subns)
         subctx.view_map[inner_path_id] = remapped_source
 
     if isinstance(qlexpr, qlast.Statement) and unnest_fence:
