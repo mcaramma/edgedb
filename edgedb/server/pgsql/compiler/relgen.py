@@ -644,12 +644,9 @@ def process_set_as_subquery(
             source_is_visible = True
         else:
             # Non-atomic computable pointer.  Theck if path source is
-            # visible in the outer scope.  The fwo fence indirections
-            # are to compensate for the extra fence around all computables
-            # in shapes.
-            outer_fence = ctx.scope_tree.parent_fence.parent_fence
-            source_is_visible = outer_fence.is_visible(
-                ir_source.path_id)
+            # visible in the outer scope.
+            outer_fence = ctx.scope_tree.parent_fence
+            source_is_visible = outer_fence.is_visible(ir_source.path_id)
 
         if source_is_visible:
             get_set_rvar(ir_set.rptr.source, ctx=ctx)

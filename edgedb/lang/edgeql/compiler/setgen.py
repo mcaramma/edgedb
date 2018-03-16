@@ -585,21 +585,21 @@ def computable_ptr_set(
         # class refs into a separate namespace.
         subctx.path_id_namespace = (subctx.aliases.get('ns'),)
     else:
-        subctx.path_scope = ctx.path_scope.add_fence()
-        subctx.path_id_namespace = (
-            subctx.path_id_namespace +
-            (irast.WeakNamespace(ctx.aliases.get('ns')),))
-        subctx.path_scope.namespaces.add(subctx.path_id_namespace[-1])
+        subns = subctx.pending_stmt_path_id_namespace = \
+            irast.WeakNamespace(ctx.aliases.get('ns'))
 
         self_view = ctx.view_sets.get(self_.scls)
         if self_view:
             inner_path_id = self_view.path_id.merge_namespace(
-                subctx.path_id_namespace)
+                subctx.path_id_namespace + (subns,))
         else:
-            inner_path_id = pathctx.get_path_id(self_.scls, ctx=subctx)
+            inner_path_id = pathctx.get_path_id(
+                self_.scls, ctx=subctx).merge_namespace((subns,))
 
-        subctx.view_map[inner_path_id] = new_set_from_set(
-            rptr.source, ctx=subctx)
+        remapped_source = new_set_from_set(rptr.source, ctx=subctx)
+        remapped_source.path_id = \
+            remapped_source.path_id.merge_namespace((subns,))
+        subctx.view_map[inner_path_id] = remapped_source
 
     if isinstance(qlexpr, qlast.Statement) and unnest_fence:
         subctx.stmt_metadata[qlexpr] = context.StatementMetadata(
