@@ -543,9 +543,10 @@ def _compile_view_shapes_in_fcall(
 
     if preserves_type:
         for arg in expr.args:
-            if arg.path_scope is not None:
+            arg_scope = pathctx.get_set_scope(arg, ctx=ctx)
+            if arg_scope is not None:
                 with ctx.new() as scopectx:
-                    scopectx.path_scope = arg.path_scope
+                    scopectx.path_scope = arg_scope
                     compile_view_shapes(arg, ctx=scopectx)
             else:
                 compile_view_shapes(arg, ctx=ctx)

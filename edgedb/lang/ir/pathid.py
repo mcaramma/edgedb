@@ -148,16 +148,19 @@ class PathId:
         return result
 
     def merge_namespace(self, namespace):
-        new_namespace = []
-        other_len = len(namespace)
-        i = -1
-        for i, item in enumerate(self._namespace):
-            if i > other_len - 1 or namespace[i] != item:
-                break
-            else:
-                new_namespace.append(item)
+        if not self._namespace:
+            new_namespace = namespace
+        else:
+            new_namespace = []
+            other_len = len(namespace)
+            i = -1
+            for i, item in enumerate(self._namespace):
+                if i > other_len - 1 or namespace[i] != item:
+                    break
+                else:
+                    new_namespace.append(item)
 
-        new_namespace.extend(namespace[i + 1:])
+            new_namespace.extend(namespace[i + 1:])
 
         return self.replace_namespace(tuple(new_namespace))
 

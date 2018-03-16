@@ -446,7 +446,13 @@ def update_scope(
         ir_set: irast.Set, stmt: pgast.Query, *,
         ctx: context.CompilerContextLevel) -> None:
 
-    scope_tree = ctx.scope_tree.find_by_unique_id(ir_set.path_scope_id)
+    scope_tree = ctx.scope_tree.root.find_by_unique_id(ir_set.path_scope_id)
+
+    if scope_tree is None:
+        print(ctx.scope_tree.root.pdebugformat())
+        import edgedb.lang.common.markup
+        edgedb.lang.common.markup.dump(ir_set)
+
     ctx.scope_tree = scope_tree
 
     child_paths = set(scope_tree.paths)

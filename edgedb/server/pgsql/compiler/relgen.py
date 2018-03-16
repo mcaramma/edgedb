@@ -1219,11 +1219,11 @@ def process_set_as_agg_expr(
                         arg_ref = output.output_as_value(
                             arg_ref, env=argctx.env)
 
+                path_scope = relctx.get_scope(ir_arg, ctx=argctx)
                 arg_is_visible = (
-                    ir_arg.path_scope is not None and
-                    ir_arg.path_scope.parent.is_any_prefix_visible(
-                        ir_arg.path_id)
-                )
+                    path_scope is not None and
+                    path_scope.parent.is_any_prefix_visible(ir_arg.path_id))
+
                 if arg_is_visible:
                     # If the argument set is visible above us, we
                     # are aggregating a singleton set, potentially on

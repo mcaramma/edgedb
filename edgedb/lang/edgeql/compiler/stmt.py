@@ -80,8 +80,8 @@ def compile_SelectQuery(
 
             if ctx.toplevel_result_view_name:
                 alias = ctx.aliases.get('expr')
-                stmt.result.path_id = irutils.get_expression_path_id(
-                    stmt.result.scls, alias, ctx.schema)
+                stmt.result.path_id = setgen.get_expression_path_id(
+                    stmt.result.scls, alias, ctx=ctx)
 
             stmt.offset = clauses.compile_limit_offset_clause(
                 expr.offset, ctx=sctx)

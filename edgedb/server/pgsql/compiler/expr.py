@@ -576,22 +576,14 @@ def compile_Coalesce(
     return pgast.FuncCall(name=('coalesce',), args=pg_args)
 
 
-def _tuple_to_row_expr(tuple_expr, *, ctx):
-    tuple_type = _infer_type(tuple_expr, ctx=ctx)
-    subtypes = tuple_type.element_types
-    row = []
-    for n in subtypes:
-        ref = irutils.new_expression_set(
-            irast.TupleIndirection(
-                expr=tuple_expr,
-                name=n,
-                path_id=irutils.tuple_indirection_path_id(
-                    tuple_expr.path_id, n, subtypes[n])),
-            ctx.env.schema
-        )
-        row.append(dispatch.compile(ref, ctx=ctx))
-
-    return pgast.RowExpr(args=row)
+def _tuple_to_row_expr(
+        tuple_set: irast.Set, *,
+        ctx: context.CompilerContextLevel) -> pgast.ImplicitRowExpr:
+    tuple_val = dispatch.compile(tuple_set, ctx=ctx)
+    if not isinstance(tuple_val, pgast.ImplicitRowExpr):
+        raise RuntimeError('tuple compilation unexpectedly did '
+                           'not return ImplicitRowExpr')
+    return tuple_val
 
 
 def _compile_set(

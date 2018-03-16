@@ -92,10 +92,14 @@ def compile_Set(
         expr: qlast.Base, *, ctx: context.ContextLevel) -> irast.Base:
     if expr.elements:
         if len(expr.elements) == 1:
+            # From the scope perspective, single-element set
+            # literals are equivalent to a binary UNION with
+            # an empty set, not to the element.
             with ctx.newscope(fenced=True) as scopectx:
-                return setgen.scoped_set(
-                    dispatch.compile(expr.elements[0], ctx=scopectx),
-                    ctx=scopectx)
+                ir_set = dispatch.compile(expr.elements[0], ctx=scopectx)
+                ir_set.path_id = setgen.get_expression_path_id(
+                    ir_set.scls, scopectx.aliases.get('expr'), ctx=scopectx)
+                return setgen.scoped_set(ir_set, ctx=scopectx)
         else:
             elements = flatten_set(expr)
             # a set literal is just sugar for a UNION

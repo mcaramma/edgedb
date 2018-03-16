@@ -19,6 +19,7 @@ from edgedb.lang.schema import concepts as s_concepts
 from edgedb.lang.schema import expr as s_expr
 from edgedb.lang.schema import links as s_links
 from edgedb.lang.schema import lproperties as s_linkprops
+from edgedb.lang.schema import name as s_name
 from edgedb.lang.schema import nodes as s_nodes
 from edgedb.lang.schema import pointers as s_pointers
 from edgedb.lang.schema import sources as s_sources
@@ -145,13 +146,9 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 source = path_tip.scls
 
             with ctx.newscope(fenced=True, temporary=True) as subctx:
-                # We must treat expression Sources like the same
-                # way we would treat a reference to a view node representing
-                # the same expression.
                 path_tip, _ = path_step(
                     path_tip, source, ptr_name, direction, ptr_target,
                     source_context=step.context, ctx=subctx)
-                extra_scopes[path_tip] = subctx.path_scope
 
         else:
             # Arbitrary expression
@@ -163,7 +160,7 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 path_tip = ensure_set(
                     dispatch.compile(step, ctx=subctx), ctx=subctx)
 
-            extra_scopes[path_tip] = subctx.path_scope
+                extra_scopes[path_tip] = subctx.path_scope
 
     mapped = ctx.view_map.get(path_tip.path_id)
     if mapped is not None:
@@ -175,15 +172,19 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
     pathctx.register_set_in_scope(path_tip, ctx=ctx)
 
     for ir_set, scope in extra_scopes.items():
-        if not scope.is_empty():
-            node = ctx.path_scope.find_descendant(ir_set.path_id)
-            if node:
-                node.attach_branch(scope)
-                set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
-                if set_scope is None:
-                    pathctx.assign_set_scope(ir_set, node, ctx=ctx)
-                elif set_scope is scope:
-                    pathctx.assign_set_scope(ir_set, None, ctx=ctx)
+        node = ctx.path_scope.find_descendant(ir_set.path_id)
+        if node is None:
+            # The path porion not being a descendant means
+            # that is is already present in the scope above us,
+            # along with the view scope.
+            continue
+
+        node.attach_branch(scope)
+        set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+        if set_scope is None:
+            pathctx.assign_set_scope(ir_set, node, ctx=ctx)
+        elif set_scope is scope:
+            pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
     return path_tip
 
@@ -396,11 +397,46 @@ def generated_set(
         ir_typeref = None
 
     alias = ctx.aliases.get('expr')
-    ir_set = irutils.new_expression_set(
-        expr, ctx.schema, path_id, alias=alias, typehint=ir_typeref)
-    ctx.all_sets.append(ir_set)
+    return new_expression_set(
+        expr, path_id, alias=alias, typehint=ir_typeref, ctx=ctx)
 
-    return ir_set
+
+def get_expression_path_id(
+        t: s_types.Type, alias: str, *,
+        ctx: context.ContextLevel) -> irast.PathId:
+    cls_name = s_name.Name(module='__expr__', name=alias)
+    if isinstance(t, (s_types.Collection, s_types.Tuple)):
+        et = t.copy()
+        et.name = cls_name
+    else:
+        et = t.__class__(name=cls_name, bases=[t])
+        et.acquire_ancestor_inheritance(ctx.schema)
+    return pathctx.get_path_id(et, ctx=ctx)
+
+
+def new_expression_set(
+        ir_expr, path_id=None, alias=None,
+        typehint: typing.Optional[irast.TypeRef]=None, *,
+        ctx: context.ContextLevel) -> irast.Set:
+    if isinstance(ir_expr, irast.EmptySet) and typehint is not None:
+        ir_expr = irast.TypeCast(expr=ir_expr, type=typehint)
+
+    result_type = irutils.infer_type(ir_expr, ctx.schema)
+
+    if path_id is None:
+        path_id = getattr(ir_expr, 'path_id', None)
+
+        if not path_id:
+            if alias is None:
+                raise ValueError('either path_id or alias are required')
+            path_id = get_expression_path_id(result_type, alias, ctx=ctx)
+
+    return new_set(
+        path_id=path_id,
+        scls=result_type,
+        expr=ir_expr,
+        ctx=ctx
+    )
 
 
 def scoped_set(

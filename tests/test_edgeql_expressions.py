@@ -458,7 +458,6 @@ class TestExpressions(tb.QueryTestCase):
                 };
             """)
 
-    @unittest.expectedFailure
     async def test_edgeql_expr_paths_09(self):
         # `Issue` in SET is illegal because it shares a prefix `Issue`
         # with `Issue.related_to` which is defined in an outer scope.
