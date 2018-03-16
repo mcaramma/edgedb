@@ -591,7 +591,13 @@ def computable_ptr_set(
             (irast.WeakNamespace(ctx.aliases.get('ns')),))
         subctx.path_scope.namespaces.add(subctx.path_id_namespace[-1])
 
-        inner_path_id = pathctx.get_path_id(self_.scls, ctx=subctx)
+        self_view = ctx.view_sets.get(self_.scls)
+        if self_view:
+            inner_path_id = self_view.path_id.merge_namespace(
+                subctx.path_id_namespace)
+        else:
+            inner_path_id = pathctx.get_path_id(self_.scls, ctx=subctx)
+
         subctx.view_map[inner_path_id] = new_set_from_set(
             rptr.source, ctx=subctx)
 

@@ -282,6 +282,10 @@ class ContextLevel(compiler.ContextLevel):
                 self.toplevel_result_view_name = \
                     prevlevel.toplevel_result_view_name
 
+            if mode in {ContextSwitchMode.NEWFENCE_TEMP,
+                        ContextSwitchMode.NEWSCOPE_TEMP}:
+                self.path_scope = prevlevel.path_scope.copy()
+
             if mode in {ContextSwitchMode.NEWSCOPE,
                         ContextSwitchMode.NEWSCOPE_TEMP}:
                 self.path_scope = prevlevel.path_scope.add_branch()
@@ -289,10 +293,6 @@ class ContextLevel(compiler.ContextLevel):
             if mode in {ContextSwitchMode.NEWFENCE,
                         ContextSwitchMode.NEWFENCE_TEMP}:
                 self.path_scope = prevlevel.path_scope.add_fence()
-
-            if mode in {ContextSwitchMode.NEWFENCE_TEMP,
-                        ContextSwitchMode.NEWSCOPE_TEMP}:
-                self.path_scope.protect_parent = True
 
     def on_pop(self, prevlevel):
         if self.mode in {ContextSwitchMode.NEWFENCE_TEMP,
