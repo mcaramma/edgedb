@@ -171,8 +171,15 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
     path_tip.context = expr.context
     pathctx.register_set_in_scope(path_tip, ctx=ctx)
 
+    print('-------------')
+    print(path_tip)
+    print(ctx.path_scope.pdebugformat())
+
     for ir_set, scope in extra_scopes.items():
         node = ctx.path_scope.find_descendant(ir_set.path_id)
+        print('scope')
+        print(scope.pdebugformat())
+        print(node)
         if node is None:
             # The path porion not being a descendant means
             # that is is already present in the scope above us,
@@ -186,6 +193,8 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
         elif set_scope is scope:
             pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
+    print(ctx.path_scope.pdebugformat())
+    print('================')
     return path_tip
 
 

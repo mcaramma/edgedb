@@ -485,7 +485,9 @@ def _compile_view_shapes_in_set(
             # mess that scope up, as the shape's source expression
             # should remain behind the SET OF fence of LIMIT.
             with ctx.new() as scopectx:
-                scopectx.path_scope = ir_set.expr.result.path_scope
+                ol_scope = pathctx.get_set_scope(
+                    ir_set.expr.result, ctx=scopectx)
+                scopectx.path_scope = ol_scope
                 pathctx.register_set_in_scope(ir_set, ctx=scopectx)
         else:
             pathctx.register_set_in_scope(ir_set, ctx=ctx)

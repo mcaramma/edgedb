@@ -415,11 +415,37 @@ def compile_TypeFilter(
 
     result = setgen.class_indirection_set(arg, typ, optional=False, ctx=ctx)
     pathctx.register_set_in_scope(result, ctx=ctx)
-    node = ctx.path_scope.find_descendant(result.path_id)
+    node = ctx.path_scope.find_descendant(arg.path_id)
     if node:
-        node.attach_branch(scopectx.path_scope)
+        fuse_scope_branch(arg, node, scopectx.path_scope, ctx=ctx)
 
     return result
+
+
+def fuse_scope_branch(
+        ir_set: irast.Set, parent: irast.ScopeTreeNode,
+        branch: irast.ScopeTreeNode, *,
+        ctx: context.ContextLevel) -> None:
+    if parent.path_id is None:
+        parent.attach_branch(branch)
+    else:
+        if branch.path_id is None and len(branch.children) == 1:
+            target_branch = next(iter(branch.children))
+        else:
+            target_branch = branch
+
+        if parent.path_id == target_branch.path_id:
+            new_root = irast.new_scope_tree()
+            for child in tuple(target_branch.children):
+                new_root.attach_child(child)
+
+            parent.attach_branch(new_root)
+        else:
+            parent.attach_branch(branch)
+
+    set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+    if set_scope is branch:
+        pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
 
 @dispatch.compile.register(qlast.Indirection)
