@@ -286,12 +286,23 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
                 descendant.remove()
 
             elif descendant.parent_fence is node:
-                # Unfenced path, find similarly unfenced in the
-                # tree.  If found, attach to the parent fence and
-                # remove all other occurrences.
-                unfenced, unnest_fence = self.find_unfenced(path_id)
-                if unfenced is not None:
-                    parent_fence = unfenced.parent_fence
+                # Unfenced path.
+                # First, find any existing descendant with the same path_id.
+                # If not found, find any _unfenced_ node that is a child of
+                # any of our ancestors.
+                # If found, attach the node directly to its parent fence
+                # and remove all other occurrences.
+                existing = self.find_descendant(path_id)
+                unnest_fence = False
+                parent_fence = None
+                if existing is None:
+                    existing, unnest_fence = self.find_unfenced(path_id)
+                    if existing is not None:
+                        parent_fence = existing.parent_fence
+                else:
+                    parent_fence = self.fence
+
+                if existing is not None:
                     if parent_fence.find_child(path_id) is None:
                         if unnest_fence:
                             if descendant.parent.path_id:
@@ -302,14 +313,14 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
                                 f'reference to '
                                 f'{offending_node.path_id.pformat()!r} '
                                 f'changes the interpretation of '
-                                f'{unfenced.path_id.pformat()!r} in '
+                                f'{existing.path_id.pformat()!r} in '
                                 f'an outer scope',
                                 offending_node=offending_node,
-                                existing_node=unfenced
+                                existing_node=existing
                             )
 
                         parent_fence.remove_descendants(path_id)
-                        parent_fence.attach_child(unfenced)
+                        parent_fence.attach_child(existing)
 
                     # Discard the node from the subtree being attached.
                     descendant.remove()
@@ -380,6 +391,7 @@ class ScopeTreeNode(pathid.ScopeBranchNode):
         else:
             subtree = self
 
+        self.remove()
         parent.attach_subtree(subtree)
 
     def unfence(self, node):  # XXX: compat
