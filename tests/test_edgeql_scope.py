@@ -1073,8 +1073,6 @@ class TestEdgeQLScope(tb.QueryTestCase):
              'Golem3', 'Sprite2', 'Giant eagle2', 'Djinn2'},
         ])
 
-    # TODO: this test is no longer correct
-    @unittest.expectedFailure
     async def test_edgeql_scope_nested_11(self):
         await self.assert_query_result(r'''
             # semantically same as control query Q3, except that some

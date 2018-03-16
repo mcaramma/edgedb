@@ -146,9 +146,16 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 source = path_tip.scls
 
             with ctx.newscope(fenced=True, temporary=True) as subctx:
-                path_tip, _ = path_step(
-                    path_tip, source, ptr_name, direction, ptr_target,
-                    source_context=step.context, ctx=subctx)
+                if isinstance(source, s_types.Tuple):
+                    path_tip = tuple_indirection_set(
+                        path_tip, source=source, ptr_name=ptr_name,
+                        source_context=step.context, ctx=subctx)
+
+                else:
+                    path_tip = ptr_step_set(
+                        path_tip, source=source, ptr_name=ptr_name,
+                        direction=direction, ptr_target=ptr_target,
+                        source_context=step.context, ctx=subctx)
 
                 extra_scopes[path_tip] = subctx.path_scope
         else:
@@ -222,55 +229,35 @@ def fuse_scope_branch(
     #     pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
 
-def path_step(
-        path_tip: irast.Set, source: s_sources.Source,
+def ptr_step_set(
+        path_tip: irast.Set, *,
+        source: s_sources.Source,
         ptr_name: typing.Tuple[str, str],
         direction: PtrDir,
-        ptr_target: s_nodes.Node,
-        source_context: parsing.ParserContext, *,
-        ctx: context.ContextLevel) \
-        -> typing.Tuple[irast.Set, s_pointers.Pointer]:
+        ptr_target: typing.Optional[s_nodes.Node]=None,
+        source_context: parsing.ParserContext,
+        ctx: context.ContextLevel) -> irast.Set:
+    ptrcls = resolve_ptr(
+        source, ptr_name, direction,
+        target=ptr_target, source_context=source_context,
+        ctx=ctx)
 
-    if isinstance(source, s_types.Tuple):
-        if ptr_name[0] is not None:
-            el_name = '::'.join(ptr_name)
-        else:
-            el_name = ptr_name[1]
+    target = ptrcls.get_far_endpoint(direction)
 
-        if el_name in source.element_types:
-            path_id = irutils.tuple_indirection_path_id(
-                path_tip.path_id, el_name,
-                source.element_types[el_name])
-            expr = irast.TupleIndirection(
-                expr=path_tip, name=el_name, path_id=path_id,
-                context=source_context)
-        else:
-            raise errors.EdgeQLReferenceError(
-                f'{el_name} is not a member of a struct')
+    mapped = ctx.view_map.get(path_tip.path_id)
+    if mapped is not None:
+        path_tip = new_set(
+            path_id=mapped.path_id,
+            scls=mapped.scls, expr=mapped.expr, ctx=ctx)
 
-        tuple_ind = generated_set(expr, ctx=ctx)
-        return tuple_ind, None
+    path_tip = extend_path(
+        path_tip, ptrcls, direction, target, ctx=ctx)
 
-    else:
-        ptrcls = resolve_ptr(
-            source, ptr_name, direction, target=ptr_target, ctx=ctx)
+    if ptr_target is not None and target != ptr_target:
+        path_tip = class_indirection_set(
+            path_tip, ptr_target, optional=False, ctx=ctx)
 
-        target = ptrcls.get_far_endpoint(direction)
-
-        mapped = ctx.view_map.get(path_tip.path_id)
-        if mapped is not None:
-            path_tip = new_set(
-                path_id=mapped.path_id,
-                scls=mapped.scls, expr=mapped.expr, ctx=ctx)
-
-        path_tip = extend_path(
-            path_tip, ptrcls, direction, target, ctx=ctx)
-
-        if ptr_target is not None and target != ptr_target:
-            path_tip = class_indirection_set(
-                path_tip, ptr_target, optional=False, ctx=ctx)
-
-        return path_tip, ptrcls
+    return path_tip
 
 
 def resolve_ptr(
@@ -278,6 +265,7 @@ def resolve_ptr(
         ptr_name: typing.Tuple[str, str],
         direction: s_pointers.PointerDirection,
         target: typing.Optional[s_nodes.Node]=None, *,
+        source_context: typing.Optional[parsing.ParserContext]=None,
         ctx: context.ContextLevel) -> s_pointers.Pointer:
     ptr_module, ptr_nqname = ptr_name
 
@@ -315,7 +303,8 @@ def resolve_ptr(
             path += f'[IS {target.name}]'
 
         raise errors.EdgeQLReferenceError(
-            f'{path} does not resolve to any known path')
+            f'{path} does not resolve to any known path',
+            context=source_context)
 
     return ptr
 
@@ -383,6 +372,33 @@ def _is_computable_ptr(
 
     if force_computable and ptrcls.default is not None:
         return True
+
+
+def tuple_indirection_set(
+        path_tip: irast.Set, *,
+        source: s_sources.Source,
+        ptr_name: typing.Tuple[str, str],
+        source_context: parsing.ParserContext,
+        ctx: context.ContextLevel) -> irast.Set:
+
+    if ptr_name[0] is not None:
+        el_name = '::'.join(ptr_name)
+    else:
+        el_name = ptr_name[1]
+
+    if el_name in source.element_types:
+        path_id = irutils.tuple_indirection_path_id(
+            path_tip.path_id, el_name,
+            source.element_types[el_name])
+        expr = irast.TupleIndirection(
+            expr=path_tip, name=el_name, path_id=path_id,
+            context=source_context)
+    else:
+        raise errors.EdgeQLReferenceError(
+            f'{el_name} is not a member of a tuple',
+            context=source_context)
+
+    return generated_set(expr, ctx=ctx)
 
 
 def class_indirection_set(

@@ -553,10 +553,10 @@ def compile_type_check_op(
         right = dispatch.compile(expr.right, ctx=subctx)
 
     ltype = irutils.infer_type(left, ctx.schema)
-    left, _ = setgen.path_step(
-        left, ltype, ('std', '__class__'),
-        s_pointers.PointerDirection.Outbound, None,
-        expr.context, ctx=ctx)
+    left = setgen.ptr_step_set(
+        left, source=ltype, ptr_name=('std', '__class__'),
+        direction=s_pointers.PointerDirection.Outbound,
+        source_context=expr.context, ctx=ctx)
 
     pathctx.register_set_in_scope(left, ctx=ctx)
 

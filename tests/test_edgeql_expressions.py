@@ -1316,7 +1316,7 @@ class TestExpressions(tb.QueryTestCase):
                 exc.EdgeQLError,
                 r'possibly more than one element returned by an expression '
                 r'where only singletons are allowed',
-                position=44):
+                position=39):
 
             await self.query('''\
                 WITH MODULE test
