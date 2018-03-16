@@ -126,13 +126,17 @@ def compile_ForQuery(
             if isinstance(iterator, qlast.Set) and len(iterator.elements) == 1:
                 iterator = iterator.elements[0]
 
-            stmt.iterator_stmt = setgen.scoped_set(
-                stmtctx.declare_view(iterator, qlstmt.iterator_alias,
-                                     ctx=scopectx),
-                ctx=scopectx)
+            iterator_view = stmtctx.declare_view(
+                iterator, qlstmt.iterator_alias, ctx=scopectx)
 
-        sctx.singletons.add(stmt.iterator_stmt.path_id)
+            stmt.iterator_stmt = setgen.new_set_from_set(
+                iterator_view, ctx=scopectx)
+
+            iterator_scope = scopectx.path_scope_map.get(iterator_view)
+
         pathctx.register_set_in_scope(stmt.iterator_stmt, ctx=sctx)
+        node = sctx.path_scope.find_descendant(stmt.iterator_stmt.path_id)
+        node.attach_branch(iterator_scope)
 
         stmt.result = compile_result_clause(
             qlstmt.result,

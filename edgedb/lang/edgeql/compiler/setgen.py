@@ -150,6 +150,7 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                     path_tip, source, ptr_name, direction, ptr_target,
                     source_context=step.context, ctx=subctx)
 
+                extra_scopes[path_tip] = subctx.path_scope
         else:
             # Arbitrary expression
             if i > 0:
@@ -160,7 +161,12 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                 path_tip = ensure_set(
                     dispatch.compile(step, ctx=subctx), ctx=subctx)
 
-                extra_scopes[path_tip] = subctx.path_scope
+                if path_tip.path_id.is_type_indirection_path():
+                    scope_set = path_tip.rptr.source
+                else:
+                    scope_set = path_tip
+
+                extra_scopes[scope_set] = subctx.path_scope
 
     mapped = ctx.view_map.get(path_tip.path_id)
     if mapped is not None:
@@ -171,31 +177,49 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
     path_tip.context = expr.context
     pathctx.register_set_in_scope(path_tip, ctx=ctx)
 
-    print('-------------')
-    print(path_tip)
-    print(ctx.path_scope.pdebugformat())
-
     for ir_set, scope in extra_scopes.items():
         node = ctx.path_scope.find_descendant(ir_set.path_id)
-        print('scope')
-        print(scope.pdebugformat())
-        print(node)
         if node is None:
             # The path porion not being a descendant means
             # that is is already present in the scope above us,
             # along with the view scope.
             continue
 
-        node.attach_branch(scope)
-        set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
-        if set_scope is None:
-            pathctx.assign_set_scope(ir_set, node, ctx=ctx)
-        elif set_scope is scope:
-            pathctx.assign_set_scope(ir_set, None, ctx=ctx)
+        fuse_scope_branch(ir_set, node, scope, ctx=ctx)
+        # set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+        # if set_scope is None:
+        #     pathctx.assign_set_scope(ir_set, node, ctx=ctx)
+        # elif set_scope is scope:
+        #     pathctx.assign_set_scope(ir_set, None, ctx=ctx)
+        # pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
-    print(ctx.path_scope.pdebugformat())
-    print('================')
     return path_tip
+
+
+def fuse_scope_branch(
+        ir_set: irast.Set, parent: irast.ScopeTreeNode,
+        branch: irast.ScopeTreeNode, *,
+        ctx: context.ContextLevel) -> None:
+    if parent.path_id is None:
+        parent.attach_branch(branch)
+    else:
+        if branch.path_id is None and len(branch.children) == 1:
+            target_branch = next(iter(branch.children))
+        else:
+            target_branch = branch
+
+        if parent.path_id == target_branch.path_id:
+            new_root = irast.new_scope_tree()
+            for child in tuple(target_branch.children):
+                new_root.attach_child(child)
+
+            parent.attach_branch(new_root)
+        else:
+            parent.attach_branch(branch)
+
+    # set_scope = pathctx.get_set_scope(ir_set, ctx=ctx)
+    # if set_scope is branch:
+    #     pathctx.assign_set_scope(ir_set, None, ctx=ctx)
 
 
 def path_step(
