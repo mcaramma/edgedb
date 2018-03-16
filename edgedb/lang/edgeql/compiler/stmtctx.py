@@ -65,9 +65,11 @@ def fini_expression(
         if ir_set.path_id.namespace:
             ir_set.path_id = ir_set.path_id.strip_weak_namespaces()
 
-    for node in ctx.path_scope.get_all_path_nodes(include_subpaths=True):
-        if node.path_id.namespace:
-            node.path_id = node.path_id.strip_weak_namespaces()
+    if ctx.path_scope is not None:
+        # Simple expressions have no scope.
+        for node in ctx.path_scope.get_all_path_nodes(include_subpaths=True):
+            if node.path_id.namespace:
+                node.path_id = node.path_id.strip_weak_namespaces()
 
     result = irast.Statement(
         expr=ir,

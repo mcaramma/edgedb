@@ -43,6 +43,8 @@ def compile_Set(
     if ctx.env.singleton_mode:
         return _compile_set_in_singleton_mode(ir_set, ctx=ctx)
 
+    is_toplevel = ctx.toplevel_stmt is None
+
     if isinstance(ir_set.expr, irast.Constant):
         # Avoid creating needlessly complicated constructs for
         # constant expressions.  Besides being an optimization,
@@ -53,7 +55,7 @@ def compile_Set(
         if shape:
             value = _compile_shape(ir_set, shape=shape, ctx=ctx)
 
-    elif ir_set.path_scope_id is not None and ctx.toplevel_stmt is not None:
+    elif ir_set.path_scope_id is not None and not is_toplevel:
         # This Set is behind a scope fence, so compute it
         # in a fenced context.
         with ctx.newscope() as scopectx:
@@ -596,6 +598,7 @@ def _compile_set(
         ir_set: irast.Set, *,
         ctx: context.CompilerContextLevel) -> pgast.Base:
 
+    is_toplevel = ctx.toplevel_stmt is None
     relgen.get_set_rvar(ir_set, ctx=ctx)
 
     shape = _get_shape(ir_set, ctx=ctx)
@@ -607,8 +610,11 @@ def _compile_set(
         else:
             aspect = 'value'
 
-        value = pathctx.get_path_var(
-            ctx.rel, ir_set.path_id, aspect=aspect, env=ctx.env)
+        if is_toplevel:
+            value = ctx.toplevel_stmt
+        else:
+            value = pathctx.get_path_var(
+                ctx.rel, ir_set.path_id, aspect=aspect, env=ctx.env)
 
     return value
 

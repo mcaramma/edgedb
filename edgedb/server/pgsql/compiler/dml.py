@@ -155,7 +155,7 @@ def fini_dml_stmt(
         dbobj.add_rel_overlay(ir_stmt.subject.scls, 'except', dml_cte,
                               env=ctx.env)
 
-    if parent_ctx.toplevel_stmt is None:
+    if parent_ctx.toplevel_stmt is wrapper:
         ret_ref = pathctx.get_path_identity_var(
             wrapper, ir_stmt.subject.path_id, env=parent_ctx.env)
         count = pgast.FuncCall(name=('count',), args=[ret_ref])

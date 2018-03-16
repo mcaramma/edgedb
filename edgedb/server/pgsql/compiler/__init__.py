@@ -51,8 +51,6 @@ def compile_ir_to_sql_tree(
         if ignore_shapes:
             ctx.expr_exposed = False
         qtree = dispatch.compile(ir_expr, ctx=ctx)
-        if expr_is_stmt:
-            qtree = ctx.toplevel_stmt
 
     except Exception as e:  # pragma: no cover
         try:

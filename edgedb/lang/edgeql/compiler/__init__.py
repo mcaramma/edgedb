@@ -91,7 +91,10 @@ def compile_ast_to_ir(tree,
 
     if debug.flags.edgeql_compile:
         debug.header('Scope Tree')
-        print(ctx.path_scope.pdebugformat())
+        if ctx.path_scope is not None:
+            print(ctx.path_scope.pdebugformat())
+        else:
+            print('N/A')
         debug.header('EdgeDB IR')
         debug.dump(ir_expr)
 

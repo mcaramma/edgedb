@@ -473,6 +473,7 @@ def computable_ptr_set(
     subctx.class_shapes = ctx.class_shapes.copy()
     subctx.all_sets = ctx.all_sets
     subctx.path_scope_map = ctx.path_scope_map
+    subctx.scope_id_ctr = ctx.scope_id_ctr
 
     if isinstance(ptrcls, s_linkprops.LinkProperty):
         source_path_id = rptr.source.path_id.ptr_path()
@@ -508,7 +509,7 @@ def computable_ptr_set(
         subctx.view_map = qlctx.view_map.new_child()
         subctx.singletons = qlctx.singletons.copy()
         subctx.class_shapes = qlctx.class_shapes.copy()
-        subctx.path_id_namespace = qlctx.path_id_namespace
+        subctx.path_id_namespce = qlctx.path_id_namespace
 
     if qlctx is None:
         # This is a schema-level computable expression, put all
