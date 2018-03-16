@@ -27,7 +27,7 @@ class PathId:
             self._path = initializer._path
             self._norm_path = initializer._norm_path
             if namespace is not None:
-                self._namespace = namespace
+                self._namespace = frozenset(namespace)
             else:
                 self._namespace = initializer._namespace
             self._is_ptr = initializer._is_ptr
@@ -42,12 +42,12 @@ class PathId:
                 self._norm_path = (initializer.peel_view(),)
             else:
                 self._norm_path = (initializer,)
-            self._namespace = namespace
+            self._namespace = frozenset(namespace) if namespace else None
             self._is_ptr = False
         else:
             self._path = ()
             self._norm_path = ()
-            self._namespace = namespace
+            self._namespace = frozenset(namespace) if namespace else None
             self._is_ptr = False
 
     def __hash__(self):
@@ -102,7 +102,7 @@ class PathId:
 
         if self._namespace:
             ns_str = []
-            for item in self._namespace:
+            for item in sorted(self._namespace):
                 if isinstance(item, WeakNamespace):
                     ns_str.append(f'[{item}]')
                 else:
@@ -143,7 +143,7 @@ class PathId:
         result = self.__class__()
         result._path = self._path
         result._norm_path = self._norm_path
-        result._namespace = namespace
+        result._namespace = frozenset(namespace) if namespace else None
         result._is_ptr = self._is_ptr
         return result
 
@@ -151,18 +151,9 @@ class PathId:
         if not self._namespace:
             new_namespace = namespace
         else:
-            new_namespace = []
-            other_len = len(namespace)
-            i = -1
-            for i, item in enumerate(self._namespace):
-                if i > other_len - 1 or namespace[i] != item:
-                    break
-                else:
-                    new_namespace.append(item)
+            new_namespace = self._namespace | frozenset(namespace)
 
-            new_namespace.extend(namespace[i + 1:])
-
-        return self.replace_namespace(tuple(new_namespace))
+        return self.replace_namespace(new_namespace)
 
     def strip_weak_namespaces(self):
         stripped_ns = tuple(bit for bit in self._namespace
@@ -171,8 +162,7 @@ class PathId:
 
     def strip_namespace(self, namespace):
         if self._namespace and namespace:
-            stripped_ns = tuple(bit for bit in self._namespace
-                                if bit not in namespace)
+            stripped_ns = self._namespace - set(namespace)
             return self.replace_namespace(stripped_ns)
         else:
             return self
@@ -183,11 +173,11 @@ class PathId:
         if not self._namespace:
             return
 
-        for i, bit in enumerate(reversed(self._namespace)):
-            if not isinstance(bit, WeakNamespace):
-                break
+        weak_nses = [ns for ns in self._namespace
+                     if isinstance(ns, WeakNamespace)]
 
-            yield self.replace_namespace(self._namespace[:-(i + 1)])
+        for weak_ns in weak_nses:
+            yield self.replace_namespace(self._namespace - {weak_ns})
 
     def pformat(self):
         """Pretty PathId format for user-visible messages."""

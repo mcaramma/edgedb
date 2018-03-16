@@ -7,7 +7,6 @@
 
 """Query scope tree implementation."""
 
-import itertools
 import textwrap
 import typing
 import weakref
@@ -554,20 +553,20 @@ def _paths_equal_to_shortest_ns(path_id_1: pathid.PathId,
     if path_id_1 is None or path_id_2 is None:
         return False
 
-    ns1 = path_id_1.namespace or ()
-    ns2 = path_id_2.namespace or ()
+    ns1 = path_id_1.namespace or set()
+    ns2 = path_id_2.namespace or set()
 
     if not ns1 and not ns2:
         return path_id_1 == path_id_2
     else:
-        pairs = itertools.takewhile(lambda ns: ns[0] == ns[1], zip(ns1, ns2))
-        common_ns = tuple(pair[0] for pair in pairs)
+        extra_in_1 = ns1 - ns2
+        extra_in_2 = ns2 - ns1
 
-        if not common_ns:
-            # namespaces do not intersect
+        if extra_in_1 and extra_in_2:
+            # neither namespace is a proper subset of another
             return False
         else:
-            path_id_1 = path_id_1.replace_namespace(common_ns)
-            path_id_2 = path_id_2.replace_namespace(common_ns)
+            path_id_1 = path_id_1.replace_namespace(None)
+            path_id_2 = path_id_2.replace_namespace(None)
 
-        return path_id_1 == path_id_2
+            return path_id_1 == path_id_2
