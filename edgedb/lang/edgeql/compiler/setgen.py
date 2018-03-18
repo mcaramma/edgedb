@@ -43,6 +43,11 @@ PtrDir = s_pointers.PointerDirection
 
 
 def new_set(*, ctx: context.ContextLevel, **kwargs) -> irast.Set:
+    """Create a new ir.Set instance with given attributes.
+
+    Absolutely all ir.Set instances must be created using this
+    constructor.
+    """
     ir_set = irast.Set(**kwargs)
     ctx.all_sets.append(ir_set)
     return ir_set
@@ -50,9 +55,20 @@ def new_set(*, ctx: context.ContextLevel, **kwargs) -> irast.Set:
 
 def new_set_from_set(
         ir_set: irast.Set, *,
+        preserve_scope_ns: bool=False,
         ctx: context.ContextLevel) -> irast.Set:
+    """Create a new ir.Set from another ir.Set.
+
+    The new Set inherits source Set's scope, schema class, expression,
+    and, if *preserve_scope_ns* is set, path_id.  If *preserve_scope_ns*
+    is False, the new Set's path_id will be namespaced with the currently
+    active scope namespace.
+    """
+    path_id = ir_set.path_id
+    if not preserve_scope_ns:
+        path_id = path_id.merge_namespace(ctx.path_id_namespace)
     result = new_set(
-        path_id=ir_set.path_id.merge_namespace(ctx.path_id_namespace),
+        path_id=path_id,
         path_scope_id=ir_set.path_scope_id,
         scls=ir_set.scls,
         expr=ir_set.expr,
@@ -62,6 +78,7 @@ def new_set_from_set(
 
 
 def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
+    """Create an ir.Set representing the given EdgeQL path expression."""
     anchors = ctx.anchors
 
     path_tip = None
@@ -74,6 +91,8 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                                      context=expr.context)
 
     extra_scopes = {}
+    computables = []
+    path_sets = []
 
     for i, step in enumerate(expr.steps):
         if isinstance(step, qlast.Self):
@@ -155,9 +174,21 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
                     path_tip = ptr_step_set(
                         path_tip, source=source, ptr_name=ptr_name,
                         direction=direction, ptr_target=ptr_target,
+                        ignore_computable=True,
                         source_context=step.context, ctx=subctx)
 
-                extra_scopes[path_tip] = subctx.path_scope
+                    ptrcls = path_tip.rptr.ptrcls
+                    if _is_computable_ptr(ptrcls, ctx=ctx):
+                        print(source, ptrcls, _is_computable_ptr(ptrcls, ctx=ctx))
+                        import edgedb.lang.common.markup
+                        edgedb.lang.common.markup.dump(ctx.aliased_views)
+                        import edgedb.lang.common.markup
+                        edgedb.lang.common.markup.dump(ctx.view_map)
+                        computables.append(path_tip)
+                        import traceback
+                        traceback.print_stack()
+
+                # extra_scopes[path_tip] = subctx.path_scope
         else:
             # Arbitrary expression
             if i > 0:
@@ -175,14 +206,33 @@ def compile_path(expr: qlast.Path, *, ctx: context.ContextLevel) -> irast.Set:
 
                 extra_scopes[scope_set] = subctx.path_scope
 
-    mapped = ctx.view_map.get(path_tip.path_id)
-    if mapped is not None:
-        path_tip = new_set(
-            path_id=mapped.path_id,
-            scls=mapped.scls, expr=mapped.expr, ctx=ctx)
+        mapped = ctx.view_map.get(path_tip.path_id)
+        if mapped is not None:
+            path_tip = new_set(
+                path_id=mapped.path_id,
+                scls=mapped.scls, expr=mapped.expr, ctx=ctx)
+
+        path_sets.append(path_tip)
 
     path_tip.context = expr.context
     pathctx.register_set_in_scope(path_tip, ctx=ctx)
+
+    for ir_set in computables:
+        scope = ctx.path_scope.find_descendant(ir_set.path_id)
+        if scope is None:
+            # The path is already in the scope, no point
+            # in recompiling the computable expression.
+            continue
+
+        with ctx.new() as subctx:
+            subctx.path_scope = scope
+            comp_ir_set = computable_ptr_set(ir_set.rptr, ctx=subctx)
+            i = path_sets.index(ir_set)
+            if i != len(path_sets) - 1:
+                path_sets[i + 1].rptr.source = comp_ir_set
+            else:
+                path_tip = comp_ir_set
+            path_sets[i] = comp_ir_set
 
     for ir_set, scope in extra_scopes.items():
         node = ctx.path_scope.find_descendant(ir_set.path_id)
@@ -236,6 +286,7 @@ def ptr_step_set(
         direction: PtrDir,
         ptr_target: typing.Optional[s_nodes.Node]=None,
         source_context: parsing.ParserContext,
+        ignore_computable: bool=False,
         ctx: context.ContextLevel) -> irast.Set:
     ptrcls = resolve_ptr(
         source, ptr_name, direction,
@@ -244,14 +295,15 @@ def ptr_step_set(
 
     target = ptrcls.get_far_endpoint(direction)
 
-    mapped = ctx.view_map.get(path_tip.path_id)
-    if mapped is not None:
-        path_tip = new_set(
-            path_id=mapped.path_id,
-            scls=mapped.scls, expr=mapped.expr, ctx=ctx)
+    # mapped = ctx.view_map.get(path_tip.path_id)
+    # if mapped is not None:
+    #     path_tip = new_set(
+    #         path_id=mapped.path_id,
+    #         scls=mapped.scls, expr=mapped.expr, ctx=ctx)
 
     path_tip = extend_path(
-        path_tip, ptrcls, direction, target, ctx=ctx)
+        path_tip, ptrcls, direction, target,
+        ignore_computable=ignore_computable, ctx=ctx)
 
     if ptr_target is not None and target != ptr_target:
         path_tip = class_indirection_set(
@@ -314,6 +366,7 @@ def extend_path(
         ptrcls: s_pointers.Pointer,
         direction: PtrDir=PtrDir.Outbound,
         target: typing.Optional[s_nodes.Node]=None, *,
+        ignore_computable: bool=False,
         force_computable: bool=False,
         unnest_fence: bool=False,
         ctx: context.ContextLevel) -> irast.Set:
@@ -349,7 +402,8 @@ def extend_path(
 
     target_set.rptr = ptr
 
-    if _is_computable_ptr(ptrcls, force_computable=force_computable, ctx=ctx):
+    if (not ignore_computable and _is_computable_ptr(
+            ptrcls, force_computable=force_computable, ctx=ctx)):
         target_set = computable_ptr_set(
             ptr, unnest_fence=unnest_fence, ctx=ctx)
 
@@ -358,7 +412,7 @@ def extend_path(
 
 def _is_computable_ptr(
         ptrcls, *,
-        force_computable: bool,
+        force_computable: bool=False,
         ctx: context.ContextLevel) -> bool:
     try:
         qlexpr, qlctx = ctx.source_map[ptrcls]
