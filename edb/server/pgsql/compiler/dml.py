@@ -85,7 +85,8 @@ def init_dml_stmt(
         dml_stmt, target_ir_set.path_id, dml_stmt.relation, env=ctx.env)
     pathctx.put_path_source_rvar(
         dml_stmt, target_ir_set.path_id, dml_stmt.relation, env=ctx.env)
-    dml_stmt.path_scope.add(target_ir_set.path_id)
+    pathctx.put_path_bond(
+        dml_stmt, target_ir_set.path_id)
 
     dml_cte = pgast.CommonTableExpr(
         query=dml_stmt,
@@ -938,7 +939,7 @@ def process_link_values(
         for element in shape_tuple.elements:
             name = element.path_id.rptr_name()
             if name is None:
-                name = element.path_id[-1].name
+                name = element.path_id.target.name
             colname = common.edgedb_name_to_pg_name(name)
             val = pathctx.get_rvar_path_value_var(
                 input_rvar, element.path_id, env=ctx.env)
